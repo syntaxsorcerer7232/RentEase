@@ -1,0 +1,135 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String?
+  googleId      String?   @unique
+  firstName     String
+  lastName      String
+  role          String    @default("USER")  // USER, VENDOR, ADMIN
+  kycStatus     KycStatus @default(PENDING)
+  kycDocument   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  vendorProfile VendorProfile?
+  rentals       Rental[]
+  tickets       MaintenanceTicket[]
+  paymentMethods PaymentMethod[]
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VendorProfile {
+  id           String    @id @default(uuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id])
+  businessName String
+  businessLogo String?
+  description  String?
+  approved     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  products     Product[]
+  tickets      MaintenanceTicket[]
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  slug     String    @unique
+  products Product[]
+}
+
+model Product {
+  id              String      @id @default(uuid())
+  vendorId        String
+  vendor          VendorProfile @relation(fields: [vendorId], references: [id])
+  categoryId      String
+  category        Category    @relation(fields: [categoryId], references: [id])
+  name            String
+  description     String
+  monthlyRate     Float
+  securityDeposit Float
+  images          String      // JSON string
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  assets          Asset[]
+}
+
+model Asset {
+  id           String      @id @default(uuid())
+  productId    String
+  product      Product     @relation(fields: [productId], references: [id])
+  serialNumber String      @unique
+  status       String      @default("AVAILABLE") // AVAILABLE, RENTED, MAINTENANCE, RETIRED
+  rentals      Rental[]
+}
+
+model Rental {
+  id                     String       @id @default(uuid())
+  userId                 String
+  user                   User         @relation(fields: [userId], references: [id])
+  assetId                String
+  asset                  Asset        @relation(fields: [assetId], references: [id])
+  startDate              DateTime     @default(now())
+  endDate                DateTime?
+  status                 String       @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  stripeSubscriptionId   String?
+  stripeCheckoutSessionId String?
+  totalPaid              Float
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  tickets                MaintenanceTicket[]
+}
+
+model MaintenanceTicket {
+  id          String       @id @default(uuid())
+  rentalId    String
+  rental      Rental       @relation(fields: [rentalId], references: [id])
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  vendorId    String
+  vendor      VendorProfile @relation(fields: [vendorId], references: [id])
+  description String
+  images      String?      // JSON string or comma-separated urls
+  status      TicketStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model PaymentMethod {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // card, bank, etc.
+  last4     String
+  expiry    String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
